@@ -1,101 +1,463 @@
 package main
 
 import (
-	"fmt"
-	//"reflect"
 	"database/sql"
 	"encoding/base64"
-	"strings"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const (
-	dbUser    = "root"
-	dbPass    = ""
-	dbName    = "disenadorlogodb"
-	dbCharset = "utf8"
-)
+/*DB es la estructura para la configuracion de la BD  */
+type DB struct {
+	ip       string
+	port     string
+	name     string
+	user     string
+	password string
+}
 
-func main() {
+/*DBConfig son los datos de la bd del diseñador*/
+var DBConfig = DB{
+	ip:       "127.0.0.1",
+	port:     "3306",
+	name:     "disenadorlogodb",
+	user:     "root",
+	password: "",
+}
 
-	db, err := sql.Open("mysql", dbUser+":"+dbPass+"@/"+dbName+"?charset="+dbCharset)
+var client = http.Client{}
+
+var colors = []string{"#000000", "#ff0000", "#020100"}
+
+/*Icon representa un icono de NounProject*/
+type Icon struct {
+	ID       int
+	svg      string
+	tags     []string
+	category string
+	color    string
+	nounID   int
+}
+
+/*IconJSON representa un JSON individual de Icono*/
+type IconJSON struct {
+	URL      string   `json:"url"`
+	Tags     []string `json:"tags"` //tags en ingles
+	Category string   `json:"category"`
+}
+
+/*TagJSON representa un JSON individiual de Tag */
+type TagJSON struct {
+	Categoria string `json:"categoria"`
+	ESP       string `json:"ESP"`
+	ENG       string `json:"ENG"`
+}
+
+func createDB() error {
+
+	db, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/")
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
 	defer db.Close()
 
-	stmt, err := db.Prepare("SELECT idElemento, svg FROM elementos WHERE tipo = 'ICONO'")
+	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS icons_uploads")
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("USE icons_uploads")
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS icons_uploads ( id  int NOT NULL PRIMARY KEY auto_increment, nounId int NOT NULL UNIQUE, disenadorId int NOT NULL UNIQUE)")
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+/*LeerImagen abre realiza una peticion Get por una imagen, la transforma en string y devuelve 1 objeto icono */
+func leerImagen(descargas *chan *Icon, wg *sync.WaitGroup, url string, tags []string, category string, nounID int) {
+
+	defer wg.Done()
+
+	resImg, err := client.Get(url)
 
 	if err != nil {
 
-		panic(err.Error())
+		fmt.Println(err.Error())
+
+		return
+	}
+	defer resImg.Body.Close()
+
+	if resImg.StatusCode == http.StatusOK {
+
+		imgBytes, errBody := ioutil.ReadAll(resImg.Body)
+
+		if errBody != nil {
+			fmt.Println(errBody.Error())
+			return
+		}
+
+		svgParsed, color := svgParser(string(imgBytes))
+
+		svgBase64 := base64.StdEncoding.EncodeToString([]byte(svgParsed))
+
+		iconoDescargado := Icon{svg: svgBase64, tags: tags, category: category, color: color, nounID: nounID}
+
+		*descargas <- &iconoDescargado
+
 	}
 
-	rows, err := stmt.Query()
+}
+
+func svgParser(svg string) (svgParsed string, color string) {
+
+	color = colors[rand.Intn(len(colors))]
+
+	svgParsed = `<svg fill="` + color + `" ` + strings.SplitN(svg, "<svg", 2)[1]
+
+	return
+
+}
+
+func findMetas(source *map[string]TagJSON, tagEng string) *TagJSON {
+
+	tags := *source
+
+	tag, exist := tags[tagEng]
+
+	if !exist {
+		return nil
+	}
+
+	return &tag
+
+}
+
+func (i *Icon) insert() error {
+
+	dbUploads, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/icons_uploads")
 
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
+	defer dbUploads.Close()
 
-	var colores = []string{"#F5D327","#70C041","#51A7F9","#B36AE2"}
-	var logos []map[string]string
-	var contador int
-	for rows.Next() {
+	stmt, err := dbUploads.Prepare("SELECT disenadorId FROM icons_uploads WHERE nounId = ?")
+	if err != nil {
+		return err
+	}
+	
+	defer stmt.Close()
 
-		//logo := make(map[string]interface{})
+	var id int
 
-		var id, svg string
+	err = stmt.QueryRow(i.nounID).Scan(&id)
 
-		rows.Scan(&id, &svg)
+	if err != nil {
+		if err == sql.ErrNoRows {
 
-		svgNatural, err := base64.StdEncoding.DecodeString(svg)
-		if err != nil {
-			
-		} else{
-			if !strings.HasPrefix(string(svgNatural), "<svg fill=") {
+			dbDisenador, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/"+DBConfig.name)
 
-				svgRoto := "<svg" + strings.SplitN(string(svgNatural), "<svg", 2)[1]
-				if !strings.HasPrefix(svgRoto, "<svg fill="){
-
-					colorAzar := colores[rand.Intn(3)]
-
-					svgRoto = "<svg fill=\"" + colorAzar + "\"" + strings.SplitN(string(svgNatural), "<svg", 2)[1]
-					contador++
-
-					logo := make(map[string]string)
-
-					logo["id"] = id
-					logo["svg"] = base64.StdEncoding.EncodeToString([]byte(svgRoto)) 
-					logo["color"] = colorAzar
-
-					fmt.Println(logo)
-
-					logos = append(logos, logo)
-				}
-				
+			if err != nil {
+				return err
 			}
+			defer dbDisenador.Close()
+
+			var idCategory int
+
+			stmtCategory, err := dbDisenador.Prepare("SELECT idCategoria FROM categorias WHERE nombreCategoria = ?")
+			if err != nil {
+				return err
+			}
+
+			defer stmtCategory.Close()
+
+			err = stmtCategory.QueryRow(i.category).Scan(&idCategory)
+
+			if err != nil {
+				return err
+			}
+
+			stmtInsert, err := dbDisenador.Prepare("INSERT INTO elementos(nombre, svg, color, tipo, comprado, categorias_idCategoria) VALUES ('algo', ?, ?, 'ICONO', 0, ?)")
+
+			if err != nil {
+				return err
+			}
+			
+			defer stmtInsert.Close()
+
+			res, err := stmtInsert.Exec(i.svg, i.color, idCategory)
+
+			if err != nil {
+				return err
+			}
+
+			lastID, err := res.LastInsertId()
+
+			if err != nil {
+				return err
+			}
+
+			i.ID = int(lastID)
+
+			stmtInsertUpload, err := dbUploads.Prepare("INSERT INTO icons_uploads(nounId,disenadorId) VALUES (?,?)")
+
+			if err != nil {
+				return err
+			}
+
+			defer stmtInsertUpload.Close()
+
+			_, err = stmtInsertUpload.Exec(i.nounID, i.ID)
+
+			if err != nil {
+				return err
+			}
+
+			return nil
+
+		}
+		
+		return err
+		
+	}
+
+	i.ID = id
+
+	return nil
+
+}
+
+func (i *Icon) insertRelTag(tag int) error {
+
+	db, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/"+DBConfig.name)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	stmt, err := db.Prepare("SELECT etiquetas_idEtiqueta, elementos_idElemento FROM elementos_has_etiquetas WHERE elementos_idElemento = ? AND etiquetas_idEtiqueta = ?")
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	var (
+		idElemento int
+		idEtiqueta int
+	)
+
+	err = stmt.QueryRow(i.ID, tag).Scan(&idElemento, &idEtiqueta)
+	if err != nil {
+
+		if err == sql.ErrNoRows {
+
+			stmt, err := db.Prepare("INSERT INTO elementos_has_etiquetas(elementos_idElemento,etiquetas_idEtiqueta) VALUES (?, ?)")
+			if err != nil {
+				return err
+			}
+
+			defer stmt.Close()
+			
+			_, err = stmt.Exec(i.ID, tag)
+
+			if err != nil {
+				return err
+			}
+
+		
+
+		} else {
+			return err
 		}
 
 	}
 
+	return nil
 
+}
 
-	for _, logoN := range logos {
-		stmt, err := db.Prepare("UPDATE elementos SET svg = ?, color = ? WHERE idElemento = ?")
+func (t *TagJSON) insert() (int, error) {
+
+	db, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/"+DBConfig.name)
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+
+	stmt, err := db.Prepare("SELECT idEtiqueta FROM etiquetas WHERE nombreEtiqueta = ?")
+	if err != nil {
+		return 0, err
+	}
+
+	defer stmt.Close()
+
+	var id int
+
+	err = stmt.QueryRow(t.ESP).Scan(&id)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+
+			stmtIn, err := db.Prepare("INSERT INTO etiquetas(nombreEtiqueta) VALUES (?)")
+			if err != nil {
+				return 0, err
+			}
+			defer stmtIn.Close()
+			resIn, err := stmtIn.Exec(t.ESP)
+
+			if err != nil {
+				return 0, err
+			}
+
+			lastID, err := resIn.LastInsertId()
+
+			if err != nil {
+				return 0, err
+			}
+
+			id = int(lastID)
+
+		} else {
+			return 0, err
+		}
+	}
+
+	return id, nil
+}
+
+func main() {
+	//creamos un grupo para sincronizar todas las rutinas
+	var wg sync.WaitGroup
+
+	//creamos un map contenedor de los registros JSON de iconos
+	IconsJSON := make(map[string]IconJSON)
+
+	//Abrimos el archivo producido de la busqueda de NODEJS
+	iconsFile, err := os.Open("../find/icons.json")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	//decodificamos el json
+	jsonParser := json.NewDecoder(iconsFile)
+
+	err = jsonParser.Decode(&IconsJSON)
+
+	if err != nil {
+
+		panic(err.Error())
+
+	}
+
+	//contamos la cantidad de elementos, creamos un canal de comunicacion entre todas las rutinas y sincronizamos
+	cantidad := len(IconsJSON)
+	descargas := make(chan *Icon, cantidad)
+	wg.Add(cantidad)
+
+	//Iniciamos las descargas asincronicamente
+	fmt.Println("Iniciando descargas!")
+
+	for nounID, icon := range IconsJSON {
+		id, err := strconv.Atoi(nounID)
+
 		if err != nil {
-
-			panic(err.Error())
+			continue
 		}
 
-		stmt.Exec(logoN["svg"], logoN["color"], logoN["id"])
+		go leerImagen(&descargas, &wg, icon.URL, icon.Tags, icon.Category, id)
+	}
+
+	fmt.Println("Descargas en proceso...")
+
+	//esperamos a que todas las descargas se completen
+	wg.Wait()
+
+	//cerramos el canal
+	close(descargas)
+
+	fmt.Println("Proceso de descarga terminó!")
+
+	//creamos un contenedor para el JSON de tags
+	TagsJSON := make(map[string]TagJSON)
+
+	//Abrimos el archivo JSOn de tagas
+	tagsFile, err := os.Open("../find/tags.json")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	//Decodificamos el archivo
+	jsonParser = json.NewDecoder(tagsFile)
+	err = jsonParser.Decode(&TagsJSON)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Println("Verificando DB intermediaria")
+	//Revisamos si la BD intermedia de registros de descargas esta creada, si no lo está, la creamos
+	err = createDB()
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Println("Cargando logos y etiquetas a DB final")
+	//Iteramos sobre las descargas para obtener cada icono y su informacion
+	for iconDescargado := range descargas {
+
+		err = iconDescargado.insert()
+
+		if err != nil {
+			//fmt.Println(err.Error())
+			continue
+		}
+
+		//iteramos sobre cada tag del icono en Ingles
+		for _, tag := range iconDescargado.tags {
+
+			//obtenemos sus traducciones
+			tagMetas := findMetas(&TagsJSON, tag)
+			if tagMetas == nil {
+				fmt.Println(err.Error())
+				continue
+			}
+
+			//insertamos el tag en la base de datos del disenador
+			tagID, err := tagMetas.insert()
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+
+			err = iconDescargado.insertRelTag(tagID)
+
+			if err != nil {
+
+				fmt.Println(err.Error())
+			}
+
+		}
 
 	}
 
-
-	fmt.Println(contador)
-
-	//fmt.Println(logos)
+	fmt.Println("Carga Finalizada!")
 
 }

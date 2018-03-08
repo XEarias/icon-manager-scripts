@@ -1,0 +1,17 @@
+{
+  "name": "icon-manager-scripts",
+  "version": "1.0.0",
+  "description": "Manejador de carga y descarga de iconos desde Noun Project",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Xavier Arias",
+  "license": "ISC",
+  "dependencies": {
+    "csvtojson": "^1.1.9",
+    "jsonfile": "^4.0.0",
+    "node-flags": "^0.1.9",
+    "the-noun-project": "^2.0.1"
+  }
+}
