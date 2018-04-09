@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -60,6 +61,7 @@ type TagJSON struct {
 	Categoria string `json:"categoria"`
 	ESP       string `json:"ESP"`
 	ENG       string `json:"ENG"`
+	POR       string `json:"POR"`
 }
 
 func createDB() error {
@@ -162,7 +164,7 @@ func (i *Icon) insert() error {
 	if err != nil {
 		return err
 	}
-	
+
 	defer stmt.Close()
 
 	var id int
@@ -194,12 +196,12 @@ func (i *Icon) insert() error {
 				return err
 			}
 
-			stmtInsert, err := dbDisenador.Prepare("INSERT INTO elementos(nombre, svg, color, tipo, comprado, categorias_idCategoria) VALUES ('algo', ?, ?, 'ICONO', 0, ?)")
+			stmtInsert, err := dbDisenador.Prepare("INSERT INTO elementos(nombre, svg, color, tipo, comprado, categorias_idCategoria) VALUES ('Icono', ?, ?, 'ICONO', 0, ?)")
 
 			if err != nil {
 				return err
 			}
-			
+
 			defer stmtInsert.Close()
 
 			res, err := stmtInsert.Exec(i.svg, i.color, idCategory)
@@ -233,9 +235,9 @@ func (i *Icon) insert() error {
 			return nil
 
 		}
-		
+
 		return err
-		
+
 	}
 
 	i.ID = id
@@ -244,109 +246,56 @@ func (i *Icon) insert() error {
 
 }
 
-func (i *Icon) insertRelTag(tag int) error {
-	/*
-	db, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/"+DBConfig.name)
-	if err != nil {
-		return err
+func (t *TagJSON) insert() (string, error) {
+	
+	var ids []string
+	
+	request := map[string][]map[string]string{
+		"etiquetas": {
+			{
+				"ESP": t.ESP,
+				"ENG": t.ENG,
+				"POR": t.POR,
+			},
+		},
 	}
-	defer db.Close()
 
-	stmt, err := db.Prepare("SELECT etiquetas_idEtiqueta, elementos_idElemento FROM elementos_has_etiquetas WHERE elementos_idElemento = ? AND etiquetas_idEtiqueta = ?")
-	if err != nil {
-		return err
+	requestJSON, error := json.Marshal(request)
+
+	if error != nil {
+		return "", error
 	}
 
-	defer stmt.Close()
+	resInsert, err := client.Post("http://localhost:666/", "application/json", bytes.NewBuffer(requestJSON))
 
-	var (
-		idElemento int
-		idEtiqueta int
-	)
-
-	err = stmt.QueryRow(i.ID, tag).Scan(&idElemento, &idEtiqueta)
 	if err != nil {
 
-		if err == sql.ErrNoRows {
+		fmt.Println(err.Error())
 
-			stmt, err := db.Prepare("INSERT INTO elementos_has_etiquetas(elementos_idElemento,etiquetas_idEtiqueta) VALUES (?, ?)")
-			if err != nil {
-				return err
-			}
+		return "", err
+	}
+	defer resInsert.Body.Close()
 
-			defer stmt.Close()
-			
-			_, err = stmt.Exec(i.ID, tag)
+	if resInsert.StatusCode == http.StatusOK {
 
-			if err != nil {
-				return err
-			}
+		resBytes, errBody := ioutil.ReadAll(resInsert.Body)
 
-		
+		if errBody != nil {
 
-		} else {
-			return err
+			return "", errBody
 		}
 
-	}*/
+		r := strings.NewReader(string(resBytes))
 
-	if true {
+		err := json.NewDecoder(r).Decode(&ids)
 
-	}
-
-	return nil
-
-}
-
-func (t *TagJSON) insert() (int, error) {
-	/*
-	db, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/"+DBConfig.name)
-	if err != nil {
-		return 0, err
-	}
-	defer db.Close()
-
-	stmt, err := db.Prepare("SELECT idEtiqueta FROM etiquetas WHERE nombreEtiqueta = ?")
-	if err != nil {
-		return 0, err
-	}
-
-	defer stmt.Close()
-
-	var id int
-
-	err = stmt.QueryRow(t.ESP).Scan(&id)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-
-			stmtIn, err := db.Prepare("INSERT INTO etiquetas(nombreEtiqueta) VALUES (?)")
-			if err != nil {
-				return 0, err
-			}
-			defer stmtIn.Close()
-			resIn, err := stmtIn.Exec(t.ESP)
-
-			if err != nil {
-				return 0, err
-			}
-
-			lastID, err := resIn.LastInsertId()
-
-			if err != nil {
-				return 0, err
-			}
-
-			id = int(lastID)
-
-		} else {
+		if err != nil {
 			return 0, err
 		}
+
 	}
 
-	return id, nil*/
-
-	return 1, nil
+	return ids[0], nil
 }
 
 func main() {
@@ -426,13 +375,13 @@ func main() {
 	}
 
 	fmt.Println("Cargando logos y etiquetas a DB final")
+
 	//Iteramos sobre las descargas para obtener cada icono y su informacion
 	for iconDescargado := range descargas {
 
 		err = iconDescargado.insert()
 
 		if err != nil {
-			//fmt.Println(err.Error())
 			continue
 		}
 
@@ -447,18 +396,19 @@ func main() {
 			}
 
 			//insertamos el tag en la base de datos del disenador
-			tagID, err := tagMetas.insert()
+			_, err := tagMetas.insert()
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
 			}
 
-			err = iconDescargado.insertRelTag(tagID)
+			/*
+				err = iconDescargado.insertRelTag(tagID)
 
-			if err != nil {
+				if err != nil {
 
-				fmt.Println(err.Error())
-			}
+					fmt.Println(err.Error())
+				}*/
 
 		}
 
