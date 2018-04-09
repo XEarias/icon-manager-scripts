@@ -1,4 +1,3 @@
-const net = require('net');
 const config = require('./config.js');
 
 const express = require('express');
@@ -16,7 +15,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(compression());
 app.enable('trust proxy');
 
-app.use('/app', require('./routes.js'));
+const rutas = require('./routes.js');
+
+app.use('/app', rutas);
 
 app.use(function(req, res, next) {
   var err = new Error('No se encuentra');
@@ -37,4 +38,5 @@ app.use(function(err, req, res, next) {
 app.listen(config.puerto, function () {
   console.log('Servidor corriendo en : modo('+config.servidor+'), puerto('+config.puerto+')');
 });
+
 module.exports = app;

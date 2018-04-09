@@ -24,72 +24,79 @@ exports.GuardarEtiquetas = (req, res) =>
 	// itera cada etiqueta
 	async.forEachOf(etiquetas, (etiqueta, keyEtiqueta, callback) => {
 
-        let eitquetaOriginal = Object.keys(etiqueta).map(function(val) {
-            return {
-                idioma: val,
-                valor: etiqueta[val]
-            }
-        });
+		Etiqueta.ObtenerPorTraduccion(etiqueta['ENG'], (err, data) => {
+			if (data.length > 0) {
+				callback();
+			} else {
 
-        let et = { traducciones: eitquetaOriginal };
-
-        etiquetas[keyEtiqueta] = et;
-
-		// itera las traducciones de la etiqueta actual
-		async.forEachOf(et.traducciones, (traduccion, keyTraduccion, callback) => {
-
-			let normalize = (() => {
-				const from = "ÃÀÁÄÂÈÉËÊÌÍÏÎÒÓÖÔÙÚÜÛãàáäâèéëêìíïîòóöôùúüûÑñÇç",
-					to = "AAAAAEEEEIIIIOOOOUUUUaaaaaeeeeiiiioooouuuunncc",
-					mapping = {};
-
-				for (let i = 0, j = from.length; i < j; i++)
-					mapping[from.charAt(i)] = to.charAt(i);
-
-				return (str) => {
-					let ret = [];
-					for (var i = 0, j = str.length; i < j; i++) {
-						let c = str.charAt(i);
-						if (mapping.hasOwnProperty(str.charAt(i)))
-							ret.push(mapping[c]);
-						else
-							ret.push(c);
+				let eitquetaOriginal = Object.keys(etiqueta).map(function(val) {
+					return {
+						idioma: val,
+						valor: etiqueta[val]
 					}
-					return ret.join('');
-				}
-            })();
-            
-			etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor = normalize(etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor.toLowerCase());
+				});
 
-			// obtiene el idioma de la traduccion actual
-			Idioma.ObtenerPorCodigo(traduccion.idioma, (err, data) => {
-				if (data !== null) {
-					// sobreescribe el campo idioma de la etiqueta actual
-					etiquetas[keyEtiqueta].traducciones[keyTraduccion].idioma = data._id;
-					callback();
+				let et = { traducciones: eitquetaOriginal };
 
-				} else {
-					return callback({
-						msg: "No existe el idioma"
-					});
-				}
-			})
-		}, err => { // fin de each para las traducciones
+				etiquetas[keyEtiqueta] = et;
 
-			if (err) return callback(err);
+				// itera las traducciones de la etiqueta actual
+				async.forEachOf(et.traducciones, (traduccion, keyTraduccion, callback) => {
 
-			let etiquetaData = etiquetas[keyEtiqueta];
-			etiquetaData.iconos = [];
+					let normalize = (() => {
+						const from = "ÃÀÁÄÂÈÉËÊÌÍÏÎÒÓÖÔÙÚÜÛãàáäâèéëêìíïîòóöôùúüûÑñÇç",
+							to = "AAAAAEEEEIIIIOOOOUUUUaaaaaeeeeiiiioooouuuunncc",
+							mapping = {};
 
-			// guardamos la etiqueta sobreescrita despues que termine el loop de sus traducciones
-			Etiqueta.Guardar(etiquetaData, (err, data) => {
-				if (typeof data !== 'undefined' && data.insertId) {
-					insertIds.push(data.insertId);
-					callback();
-				} else {
-					return callback(err);
-				}
-			})
+						for (let i = 0, j = from.length; i < j; i++)
+							mapping[from.charAt(i)] = to.charAt(i);
+
+						return (str) => {
+							let ret = [];
+							for (var i = 0, j = str.length; i < j; i++) {
+								let c = str.charAt(i);
+								if (mapping.hasOwnProperty(str.charAt(i)))
+									ret.push(mapping[c]);
+								else
+									ret.push(c);
+							}
+							return ret.join('');
+						}
+					})();
+					
+					
+					etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor = normalize(etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor.toLowerCase());
+
+					// obtiene el idioma de la traduccion actual
+					Idioma.ObtenerPorCodigo(traduccion.idioma, (err, data) => {
+						if (data !== null) {
+							// sobreescribe el campo idioma de la etiqueta actual
+							etiquetas[keyEtiqueta].traducciones[keyTraduccion].idioma = data._id;
+							callback();
+
+						} else {
+							return callback({msg : "No existe el idioma"});
+						}
+					})
+
+				}, err => { // fin de each para las traducciones
+
+					if (err) return callback(err);
+
+					let etiquetaData = etiquetas[keyEtiqueta];
+					etiquetaData.iconos = [];
+
+					// guardamos la etiqueta sobreescrita despues que termine el loop de sus traducciones
+					Etiqueta.Guardar(etiquetaData, (err, data) => {
+						if (typeof data !== 'undefined' && data.insertId) {
+							insertIds.push(data.insertId);
+							callback();
+						} else {
+							return callback(err);
+						}
+					})
+				})
+			}
 		})
 
 	}, err => { // fin de each para las etiquetas
