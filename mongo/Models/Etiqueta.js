@@ -4,6 +4,47 @@ const objectId = Mongo.objectId;
 
 let Etiqueta = {}
 
+
+Etiqueta.ObtenerPorTraduccion = (traduccion, callback) => 
+{
+
+    console.log(traduccion)
+
+    Connection(db => {
+        const collection = db.collection('etiquetas');
+        collection.aggregate([{
+            $match: {
+                'traducciones.ENG': { $eq: traduccion }
+            }
+        }, {
+            $unwind: '$traducciones'
+        }, {
+            $lookup: {
+                from: 'idiomas',
+                localField: 'traducciones.idioma',
+                foreignField: '_id',
+                as: 'idioma'
+            }
+        }, {
+            $unwind: '$idioma'
+        }, {
+            $group: {
+                _id: '$_id',
+                traducciones: {
+                    $push: {
+                        idioma: '$idioma',
+                        valor: '$traducciones.valor'
+                    }
+                }
+            }
+        }]).toArray((err, docs) => {
+            if (err) throw err;
+            console.log(docs)
+            callback(null, docs);
+        });
+    })
+}
+
 Etiqueta.ObtenerTodos = callback => 
 {
     Connection(db => {
