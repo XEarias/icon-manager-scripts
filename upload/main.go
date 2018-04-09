@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -72,12 +73,12 @@ func createDB() error {
 	}
 	defer db.Close()
 
-	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS icons_uploads")
+	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS disenadorlogodb_uploads")
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("USE icons_uploads")
+	_, err = db.Exec("USE disenadorlogodb_uploads")
 	if err != nil {
 		return err
 	}
@@ -153,7 +154,7 @@ func findMetas(source *map[string]TagJSON, tagEng string) *TagJSON {
 
 func (i *Icon) insert() error {
 
-	dbUploads, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/icons_uploads")
+	dbUploads, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/disenadorlogodb_uploads")
 
 	if err != nil {
 		return err
@@ -247,9 +248,9 @@ func (i *Icon) insert() error {
 }
 
 func (t *TagJSON) insert() (string, error) {
-	
+
 	var ids []string
-	
+
 	request := map[string][]map[string]string{
 		"etiquetas": {
 			{
@@ -290,12 +291,47 @@ func (t *TagJSON) insert() (string, error) {
 		err := json.NewDecoder(r).Decode(&ids)
 
 		if err != nil {
-			return 0, err
+			return "", err
 		}
 
+	} else {
+		errMongo := errors.New("Error de mongo Insertando tag")
+		return "", errMongo
 	}
 
 	return ids[0], nil
+}
+
+func insertRelTag(Icon *Icon, tagIDs *[]string) error {
+
+	request := struct {
+		IDs    []int    `json:"_ids"`
+		iconos []string `json:"iconos"`
+	}{
+		IDs:    []int{Icon.ID},
+		iconos: *tagIDs,
+	}
+
+	requestJSON, error := json.Marshal(request)
+
+	if error != nil {
+		return error
+	}
+
+	resInsert, err := client.Post("http://localhost:666/app/etiquetas/iconos", "application/json", bytes.NewBuffer(requestJSON))
+
+	if err != nil {
+		return err
+	}
+	defer resInsert.Body.Close()
+
+	if resInsert.StatusCode != http.StatusOK {
+		errMongo := errors.New("Error de mongo Insertando relacion de tag-icono")
+		return errMongo
+	}
+
+	return nil
+
 }
 
 func main() {
@@ -385,6 +421,8 @@ func main() {
 			continue
 		}
 
+		var tagIDs []string
+
 		//iteramos sobre cada tag del icono en Ingles
 		for _, tag := range iconDescargado.tags {
 
@@ -396,11 +434,13 @@ func main() {
 			}
 
 			//insertamos el tag en la base de datos del disenador
-			_, err := tagMetas.insert()
+			tagID, err := tagMetas.insert()
 			if err != nil {
 				fmt.Println(err.Error())
 				continue
 			}
+
+			tagIDs = append(tagIDs, tagID)
 
 			/*
 				err = iconDescargado.insertRelTag(tagID)
