@@ -26,7 +26,13 @@ exports.GuardarEtiquetas = (req, res) =>
 
 		Etiqueta.ObtenerPorTraduccion(etiqueta['ENG'], (err, data) => {
 			if (data.length > 0) {
+
+				data.forEach( el => {
+					insertIds.push(el._id);
+				})
+
 				callback();
+
 			} else {
 
 				let eitquetaOriginal = Object.keys(etiqueta).map(function(val) {
