@@ -7,18 +7,11 @@ let Etiqueta = {}
 
 Etiqueta.ObtenerPorTraduccion = (traduccion, callback) => 
 {
-
-    console.log(traduccion)
-
     Connection(db => {
         const collection = db.collection('etiquetas');
         collection.aggregate([{
-            $match: {
-                'traducciones.ENG': { $eq: traduccion }
-            }
-        }, {
             $unwind: '$traducciones'
-        }, {
+        }, { $match : {'traducciones.valor': { $eq : traduccion} }}, {
             $lookup: {
                 from: 'idiomas',
                 localField: 'traducciones.idioma',
@@ -39,7 +32,6 @@ Etiqueta.ObtenerPorTraduccion = (traduccion, callback) =>
             }
         }]).toArray((err, docs) => {
             if (err) throw err;
-            console.log(docs)
             callback(null, docs);
         });
     })
