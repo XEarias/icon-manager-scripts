@@ -59,7 +59,7 @@ type IconJSON struct {
 
 /*TagJSON representa un JSON individiual de Tag */
 type TagJSON struct {
-	Categoria string `json:"categoria"`
+	Categoria string `json:"categoria",omitempty`
 	ESP       string `json:"ESP"`
 	ENG       string `json:"ENG"`
 	POR       string `json:"POR"`
@@ -247,33 +247,38 @@ func (i *Icon) insert() error {
 
 }
 
-func (t *TagJSON) insert() (string, error) {
+func (i *Icon) insertTag(tagsJSON *map[string]TagJSON) ([]string, error) {
+
+	var iconTagsJSON []TagJSON
+
+	for _, tag := range i.tags {
+		tagMetas := findMetas(tagsJSON, tag)
+		if tagMetas == nil {
+			continue
+		}
+		tagMetas.Categoria = ""
+		iconTagsJSON = append(iconTagsJSON, *tagMetas)
+	}
 
 	var ids []string
 
-	request := map[string][]map[string]string{
-		"etiquetas": {
-			{
-				"ESP": t.ESP,
-				"ENG": t.ENG,
-				"POR": t.POR,
-			},
-		},
+	request := map[string][]TagJSON{
+		"etiquetas": iconTagsJSON,
 	}
 
 	requestJSON, error := json.Marshal(request)
 
 	if error != nil {
-		return "", error
+		return nil, error
 	}
 
-	resInsert, err := client.Post("http://localhost:666/", "application/json", bytes.NewBuffer(requestJSON))
+	resInsert, err := client.Post("http://localhost:666/app/etiquetas", "application/json", bytes.NewBuffer(requestJSON))
 
 	if err != nil {
 
 		fmt.Println(err.Error())
 
-		return "", err
+		return nil, err
 	}
 	defer resInsert.Body.Close()
 
@@ -283,7 +288,7 @@ func (t *TagJSON) insert() (string, error) {
 
 		if errBody != nil {
 
-			return "", errBody
+			return nil, errBody
 		}
 
 		r := strings.NewReader(string(resBytes))
@@ -291,15 +296,15 @@ func (t *TagJSON) insert() (string, error) {
 		err := json.NewDecoder(r).Decode(&ids)
 
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 	} else {
 		errMongo := errors.New("Error de mongo Insertando tag")
-		return "", errMongo
+		return nil, errMongo
 	}
 
-	return ids[0], nil
+	return ids, nil
 }
 
 func insertRelTag(Icon *Icon, tagIDs *[]string) error {
@@ -415,16 +420,26 @@ func main() {
 	//Iteramos sobre las descargas para obtener cada icono y su informacion
 	for iconDescargado := range descargas {
 
-		err = iconDescargado.insert()
+		iconDescargado.insert()
+
+		idsTags, err := iconDescargado.insertTag(&TagsJSON)
 
 		if err != nil {
+			fmt.Println(err)
 			continue
 		}
 
-		var tagIDs []string
+		errRel := insertRelTag(iconDescargado, &idsTags)
+
+		if errRel != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		//var tagIDs []string
 
 		//iteramos sobre cada tag del icono en Ingles
-		for _, tag := range iconDescargado.tags {
+		/*for _, tag := range iconDescargado.tags {
 
 			//obtenemos sus traducciones
 			tagMetas := findMetas(&TagsJSON, tag)
@@ -442,15 +457,15 @@ func main() {
 
 			tagIDs = append(tagIDs, tagID)
 
-			/*
+			/
 				err = iconDescargado.insertRelTag(tagID)
 
 				if err != nil {
 
 					fmt.Println(err.Error())
-				}*/
+				}/
 
-		}
+		}*/
 
 	}
 
