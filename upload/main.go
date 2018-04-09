@@ -245,7 +245,7 @@ func (i *Icon) insert() error {
 }
 
 func (i *Icon) insertRelTag(tag int) error {
-
+	/*
 	db, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/"+DBConfig.name)
 	if err != nil {
 		return err
@@ -288,6 +288,10 @@ func (i *Icon) insertRelTag(tag int) error {
 			return err
 		}
 
+	}*/
+
+	if true {
+
 	}
 
 	return nil
@@ -295,7 +299,7 @@ func (i *Icon) insertRelTag(tag int) error {
 }
 
 func (t *TagJSON) insert() (int, error) {
-
+	/*
 	db, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/"+DBConfig.name)
 	if err != nil {
 		return 0, err
@@ -340,7 +344,9 @@ func (t *TagJSON) insert() (int, error) {
 		}
 	}
 
-	return id, nil
+	return id, nil*/
+
+	return 1, nil
 }
 
 func main() {
