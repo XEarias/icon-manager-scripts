@@ -11,6 +11,7 @@
   "dependencies": {
     "csvtojson": "^1.1.9",
     "jsonfile": "^4.0.0",
+    "mongodb": "^3.0.5",
     "node-flags": "^0.1.9",
     "the-noun-project": "^2.0.1"
   }
