@@ -1,24 +1,40 @@
 const net = require('net');
-const Etiqueta = require('./Controllers/EtiquetaController.js');
+const config = require('./config.js');
 
+const express = require('express');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const bodyParser = require('body-parser');
+const compression = require('compression');
 
-const server = net.createServer(socket => {
-	socket.write('Echo server\r\n');
-	socket.pipe(socket);
+const app = express();
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(compression());
+app.enable('trust proxy');
+
+app.use('/app', require('./routes.js'));
+
+app.use(function(req, res, next) {
+  var err = new Error('No se encuentra');
+  err.status = 404;
+  next(err);
 });
-server.listen(666, '127.0.0.1');
 
+app.disable('x-powered-by');
 
-const client = new net.Socket();
-client.connect(666, '127.0.0.1', () => {
-	console.log('Connected');
-	client.write('Hello, server! Love, Client.');
+app.use(function(err, req, res, next) {
+  res.locals.message = err.message;
+  res.locals.error = req.app.get('env') === 'development' ? err : {};
+
+  res.status(err.status || 500);
+  res.send({ error: err.message });
 });
 
-client.on('etiqueta:guardar', data => {
-    console.log(data)    
+app.listen(config.puerto, function () {
+  console.log('Servidor corriendo en : modo('+config.servidor+'), puerto('+config.puerto+')');
 });
-
-client.on('close', () => {
-	console.log('Connection closed');
-});
+module.exports = app;

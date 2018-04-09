@@ -2,32 +2,41 @@ const Etiqueta = require('../Models/Etiqueta.js');
 const Idioma = require('../Models/Idioma.js');
 const async = require('async');
 
-exports.ObtenerTodos = () => 
+exports.ObtenerTodos = (req, res) => 
 {
 	Etiqueta.ObtenerTodos((err, data) => {
 		if (data.length > 0) {
-			return {
-                status : true,
-                data : data
-            };
+			res.status(200).json(data);
 		} else {
-			return {
-                status : false,
-                msg: 'No hay etiquetas en la base de datos',
-            };
+			res.status(404).json({
+				'msg': 'No hay etiquetas en la base de datos'
+			});
 		}
 	});
 }
 
-exports.GuardarEtiquetas = (etiquetas) => 
+exports.GuardarEtiquetas = (req, res) => 
 {
+	const etiquetas = req.body.etiquetas;
+
 	let insertIds = [];
 
 	// itera cada etiqueta
 	async.forEachOf(etiquetas, (etiqueta, keyEtiqueta, callback) => {
 
+        let eitquetaOriginal = Object.keys(etiqueta).map(function(val) {
+            return {
+                idioma: val,
+                valor: etiqueta[val]
+            }
+        });
+
+        let et = { traducciones: eitquetaOriginal };
+
+        etiquetas[keyEtiqueta] = et;
+
 		// itera las traducciones de la etiqueta actual
-		async.forEachOf(etiqueta.traducciones, (traduccion, keyTraduccion, callback) => {
+		async.forEachOf(et.traducciones, (traduccion, keyTraduccion, callback) => {
 
 			let normalize = (() => {
 				const from = "ÃÀÁÄÂÈÉËÊÌÍÏÎÒÓÖÔÙÚÜÛãàáäâèéëêìíïîòóöôùúüûÑñÇç",
@@ -48,8 +57,8 @@ exports.GuardarEtiquetas = (etiquetas) =>
 					}
 					return ret.join('');
 				}
-			})();
-
+            })();
+            
 			etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor = normalize(etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor.toLowerCase());
 
 			// obtiene el idioma de la traduccion actual
@@ -86,15 +95,13 @@ exports.GuardarEtiquetas = (etiquetas) =>
 	}, err => { // fin de each para las etiquetas
 
 		if (err) {
-			return {
-                status : false,
-                msg: err,
-            };
+			res.status(500).json(err);
 		} else {
-			return {
-                status : true,
-                data : insertIds
-            };
+			if(insertIds.length){
+				res.status(200).json(insertIds);
+			}else{
+				res.status(500).json({msg:"No inserto ninguno"});
+			}
 		}
 
 	})
@@ -102,44 +109,40 @@ exports.GuardarEtiquetas = (etiquetas) =>
 }
 
 
-exports.ObtenerPorIcono = (id) => 
+exports.ObtenerPorIcono = (req, res) => 
 {
+	const id = req.params.id;
+
 	Etiqueta.ObtenerPorIcono(id, (err, data) => {
 		if (data.length > 0) {
-			return {
-                status : true,
-                data : data
-            };
+			res.status(200).json(data);
 		} else {
-            return {
-                status : false,
-                msg : 'No hay etiquetas en la base de datos'
-            };
+			res.status(404).json({
+				'msg': 'No hay etiquetas en la base de datos'
+			});
 		}
 	})
 }
 
-exports.Actualizar = (_id, etiqueta) => 
+exports.Actualizar = (req, res) => 
 {
-	const etiquetaData = etiqueta;
+	const _id = req.body._id;
+	const etiquetaData = req.body.etiqueta;
 
 	Etiqueta.Actualizar(_id, etiquetaData, (err, data) => {
 		if (data !== null && data.affectedRow) {
-			return {
-                status : true,
-                data : data
-            };
+			res.status(200).json(data);
 		} else {
-            return {
-                status : false,
-                msg : 'Algo ocurrio'
-            };
+			res.status(500).json({
+				'msg': 'Algo ocurrio'
+			});
 		}
 	})
 }
 
-exports.AsignarIconos = (_ids, iconos) => 
+exports.AsignarIconos = (req, res) => 
 {
+	const _ids = req.body._ids;
 	const idsIconos = req.body.iconos;
 
 	let affectedRows = [];
@@ -156,50 +159,41 @@ exports.AsignarIconos = (_ids, iconos) =>
 		})
 
 	}, err => {
-		if (err) {
-            return {
-                status : false,
-                msg : 'Algo ocurrio'
-            }
-        };
+		if (err) res.status(500).json({
+			'msg': 'Algo ocurrio'
+		});
 
-		return {
-            status : true,
-            data : affectedRows
-        };
-    })
+		res.status(200).json(affectedRows);
+	})
 }
 
-exports.DesasignarIcono = (_id, idIcono) => 
+exports.DesasignarIcono = (req, res) => 
 {
+	const _id = req.params._id;
+	const idIcono = req.body.idIcono;
+
 	Etiqueta.DesasignarIcono(_id, idIcono, (err, data) => {
 		if (data !== null && data.affectedRow) {
-            return {
-                status : true,
-                data : data
-            };
+			res.status(200).json(data);
 		} else {
-            return {
-                status : false,
-                msg : 'Algo ocurrio'
-            };
+			res.status(500).json({
+				'msg': 'Algo ocurrio'
+			});
 		}
 	})
 }
 
-exports.Borrar = (_id) => 
+exports.Borrar = (req, res) => 
 {
+	const _id = req.params._id;
+
 	Etiqueta.Borrar(_id, (err, data) => {
 		if (data !== null && data.affectedRow) {
-			return {
-                status : true,
-                data : data
-            };
+			res.status(200).json(data);
 		} else {
-            return {
-                status : false,
-                msg : 'Algo ocurrio'
-            };
+			res.status(500).json({
+				'msg': 'Algo ocurrio'
+			});
 		}
 	})
 }
