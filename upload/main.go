@@ -275,7 +275,7 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON) ([]string, error) {
 		return nil, error
 	}
 
-	resInsert, err := client.Post("http://192.168.0.25:666/app/etiquetas", "application/json", bytes.NewBuffer(requestJSON))
+	resInsert, err := client.Post("http://127.0.0.1:666/app/etiquetas", "application/json", bytes.NewBuffer(requestJSON))
 
 	if err != nil {
 
@@ -324,7 +324,7 @@ func insertRelTag(Icon *Icon, tagIDs *[]string) error {
 		return error
 	}
 
-	resInsert, err := client.Post("http://192.168.0.25:666/app/etiquetas/iconos", "application/json", bytes.NewBuffer(requestJSON))
+	resInsert, err := client.Post("http://127.0.0.1:666/app/etiquetas/iconos", "application/json", bytes.NewBuffer(requestJSON))
 
 	if err != nil {
 		return err
