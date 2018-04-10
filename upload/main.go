@@ -59,7 +59,7 @@ type IconJSON struct {
 
 /*TagJSON representa un JSON individiual de Tag */
 type TagJSON struct {
-	Categoria string `json:"categoria",omitempty`
+	Categoria string `json:"categoria,omitempty"`
 	ESP       string `json:"ESP"`
 	ENG       string `json:"ENG"`
 	POR       string `json:"POR"`
@@ -181,21 +181,22 @@ func (i *Icon) insert() error {
 				return err
 			}
 			defer dbDisenador.Close()
+			/*
+				var idCategory int
 
-			var idCategory int
+				stmtCategory, err := dbDisenador.Prepare("SELECT idCategoria FROM categorias WHERE nombreCategoria = ?")
+				if err != nil {
+					return err
+				}
 
-			stmtCategory, err := dbDisenador.Prepare("SELECT idCategoria FROM categorias WHERE nombreCategoria = ?")
-			if err != nil {
-				return err
-			}
+				defer stmtCategory.Close()
 
-			defer stmtCategory.Close()
+				err = stmtCategory.QueryRow(i.category).Scan(&idCategory)
 
-			err = stmtCategory.QueryRow(i.category).Scan(&idCategory)
-
-			if err != nil {
-				return err
-			}
+				if err != nil {
+					fmt.Println("error Seleccionando la categoria: " + err.Error())
+					return err
+				}*/
 
 			stmtInsert, err := dbDisenador.Prepare("INSERT INTO elementos(nombre, svg, color, tipo, comprado, categorias_idCategoria) VALUES ('Icono', ?, ?, 'ICONO', 0, ?)")
 
@@ -205,9 +206,10 @@ func (i *Icon) insert() error {
 
 			defer stmtInsert.Close()
 
-			res, err := stmtInsert.Exec(i.svg, i.color, idCategory)
+			res, err := stmtInsert.Exec(i.svg, i.color, i.category)
 
 			if err != nil {
+				fmt.Println("error insertando icono: " + err.Error())
 				return err
 			}
 
@@ -222,6 +224,7 @@ func (i *Icon) insert() error {
 			stmtInsertUpload, err := dbUploads.Prepare("INSERT INTO icons_uploads(nounId,disenadorId) VALUES (?,?)")
 
 			if err != nil {
+				fmt.Println("error insertando icon_upload: " + err.Error())
 				return err
 			}
 
@@ -272,11 +275,9 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON) ([]string, error) {
 		return nil, error
 	}
 
-	resInsert, err := client.Post("http://localhost:666/app/etiquetas", "application/json", bytes.NewBuffer(requestJSON))
+	resInsert, err := client.Post("http://192.168.0.25:666/app/etiquetas", "application/json", bytes.NewBuffer(requestJSON))
 
 	if err != nil {
-
-		fmt.Println(err.Error())
 
 		return nil, err
 	}
@@ -310,11 +311,11 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON) ([]string, error) {
 func insertRelTag(Icon *Icon, tagIDs *[]string) error {
 
 	request := struct {
-		IDs    []int    `json:"_ids"`
-		iconos []string `json:"iconos"`
+		IDs    []string `json:"_ids"`
+		Iconos []int    `json:"iconos"`
 	}{
-		IDs:    []int{Icon.ID},
-		iconos: *tagIDs,
+		IDs:    *tagIDs,
+		Iconos: []int{Icon.ID},
 	}
 
 	requestJSON, error := json.Marshal(request)
@@ -323,7 +324,7 @@ func insertRelTag(Icon *Icon, tagIDs *[]string) error {
 		return error
 	}
 
-	resInsert, err := client.Post("http://localhost:666/app/etiquetas/iconos", "application/json", bytes.NewBuffer(requestJSON))
+	resInsert, err := client.Post("http://192.168.0.25:666/app/etiquetas/iconos", "application/json", bytes.NewBuffer(requestJSON))
 
 	if err != nil {
 		return err
@@ -420,19 +421,26 @@ func main() {
 	//Iteramos sobre las descargas para obtener cada icono y su informacion
 	for iconDescargado := range descargas {
 
-		iconDescargado.insert()
+		err = iconDescargado.insert()
+
+		if err != nil {
+
+			fmt.Println("Error insertando logo:" + err.Error())
+			continue
+		}
 
 		idsTags, err := iconDescargado.insertTag(&TagsJSON)
 
 		if err != nil {
-			fmt.Println(err)
+
+			fmt.Println("Error insertando tags:" + err.Error())
 			continue
 		}
 
 		errRel := insertRelTag(iconDescargado, &idsTags)
 
 		if errRel != nil {
-			fmt.Println(err)
+			fmt.Println("Error relacionando tags:" + errRel.Error())
 			continue
 		}
 
