@@ -3,7 +3,7 @@ const ObjectId = require('mongodb').ObjectID;
 
 // Connection URL
 const datos = {
-    url: "mongodb+srv://cis:unaclavemuysegura5000@bazam-cgzwr.mongodb.net/admin",
+    url: "mongodb://127.0.0.1:27017",
     database: "disenador"
 };
 

@@ -2,11 +2,7 @@ const node_env = process.env.NODE_ENV || "desarrollo";
 
 const configuracion = {
     produccion : {
-        servidor : "Produccion",
-        mongo : {
-            url: "mongodb+srv://cis:unaclavemuysegura5000@bazam-cgzwr.mongodb.net/admin",
-            database : "disenador"
-        }
+        servidor : "Produccion"
     },
 
     desarrollo : {
@@ -14,11 +10,7 @@ const configuracion = {
         secret :"unaclavemuysegura",
     	seguridad :true,
     	puerto : "666",
-    	url : "http://localhost:666",
-        mongo : {
-            url : "mongodb+srv://cis:unaclavemuysegura5000@bazam-cgzwr.mongodb.net/admin",
-            database : "disenador"
-        }
+    	url : "http://127.0.0.1:666",
     }
 }
 

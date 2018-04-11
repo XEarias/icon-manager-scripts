@@ -32,8 +32,8 @@ var DBConfig = DB{
 	ip:       "127.0.0.1",
 	port:     "3306",
 	name:     "disenadorlogodb",
-	user:     "root",
-	password: "",
+	user:     "logoPro",
+	password: "&rJ-fZ:1uZ24",
 }
 
 var client = http.Client{}
