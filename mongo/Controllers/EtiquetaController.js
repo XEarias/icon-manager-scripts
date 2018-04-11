@@ -25,6 +25,7 @@ exports.GuardarEtiquetas = (req, res) =>
 	async.forEachOf(etiquetas, (etiqueta, keyEtiqueta, callback) => {
 
 		Etiqueta.ObtenerPorTraduccion(etiqueta['ENG'], (err, data) => {
+
 			if (data.length > 0) {
 
 				data.forEach( el => {
@@ -35,7 +36,11 @@ exports.GuardarEtiquetas = (req, res) =>
 
 			} else {
 
-				let eitquetaOriginal = Object.keys(etiqueta).map(function(val) {
+				let keys = Object.keys(etiqueta).filter( (val) => {
+					return val != 'categoria';
+				})
+
+				let eitquetaOriginal = keys.map(function(val) {
 					return {
 						idioma: val,
 						valor: etiqueta[val]
@@ -69,7 +74,6 @@ exports.GuardarEtiquetas = (req, res) =>
 							return ret.join('');
 						}
 					})();
-					
 					
 					etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor = normalize(etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor.toLowerCase());
 
