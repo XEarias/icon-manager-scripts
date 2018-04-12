@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -34,6 +36,18 @@ var DBConfig = DB{
 	name:     "disenadorlogodb",
 	user:     "root",
 	password: "",
+}
+
+/*TCPclient es la estructura para la configuracion de las conexiones TCP a mongo */
+type TCPclient struct {
+	ip   string
+	port string
+}
+
+/*TCPconfig son los datos de la del cliente de mongodb*/
+var TCPconfig = TCPclient{
+	ip:   "192.168.0.25",
+	port: "666",
 }
 
 var client = http.Client{}
@@ -181,22 +195,6 @@ func (i *Icon) insert() error {
 				return err
 			}
 			defer dbDisenador.Close()
-			/*
-				var idCategory int
-
-				stmtCategory, err := dbDisenador.Prepare("SELECT idCategoria FROM categorias WHERE nombreCategoria = ?")
-				if err != nil {
-					return err
-				}
-
-				defer stmtCategory.Close()
-
-				err = stmtCategory.QueryRow(i.category).Scan(&idCategory)
-
-				if err != nil {
-					fmt.Println("error Seleccionando la categoria: " + err.Error())
-					return err
-				}*/
 
 			stmtInsert, err := dbDisenador.Prepare("INSERT INTO elementos(nombre, svg, color, tipo, comprado, categorias_idCategoria) VALUES ('Icono', ?, ?, 'ICONO', 0, ?)")
 
@@ -250,7 +248,7 @@ func (i *Icon) insert() error {
 
 }
 
-func (i *Icon) insertTag(tagsJSON *map[string]TagJSON) ([]string, error) {
+func (i *Icon) insertTag(tagsJSON *map[string]TagJSON, TCPconn *net.Conn) ([]string, error) {
 
 	var iconTagsJSON []TagJSON
 
@@ -265,58 +263,80 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON) ([]string, error) {
 
 	var ids []string
 
-	request := map[string][]TagJSON{
-		"etiquetas": iconTagsJSON,
+	request := struct {
+		ID     int64  `json: "id"`
+		Action string `json:"action"`
+		Data   struct {
+			Etiquetas []TagJSON `json:"etiquetas"`
+		} `json:"Data"`
+	}{
+		ID:     time.Now().Unix(),
+		Action: "guardar",
 	}
 
-	requestJSON, error := json.Marshal(request)
+	request.Data.Etiquetas = iconTagsJSON
 
-	if error != nil {
-		return nil, error
-	}
-
-	resInsert, err := client.Post("http://127.0.0.1:666/app/etiquetas", "application/json", bytes.NewBuffer(requestJSON))
+	requestJSON, err := json.Marshal(request)
 
 	if err != nil {
-
 		return nil, err
 	}
-	defer resInsert.Body.Close()
 
-	if resInsert.StatusCode == http.StatusOK {
+	fmt.Fprintf(*TCPconn, string(requestJSON))
 
-		resBytes, errBody := ioutil.ReadAll(resInsert.Body)
+	// listen for reply
+	resMongo, err := bufio.NewReader(*TCPconn).ReadString('\n')
 
-		if errBody != nil {
-
-			return nil, errBody
-		}
-
-		r := strings.NewReader(string(resBytes))
-
-		err := json.NewDecoder(r).Decode(&ids)
-
-		if err != nil {
-			return nil, err
-		}
-
-	} else {
-		errMongo := errors.New("Error de mongo Insertando tag")
-		return nil, errMongo
+	if err != nil {
+		return nil, err
 	}
+
+	var resMongoJSON struct {
+		Status float64  `json:"status"`
+		Action string   `json:"action"`
+		ID     float64  `json:"id"`
+		Data   []string `json:"data"`
+		Error  string   `json:"error"`
+	}
+
+	errMongo := json.Unmarshal([]byte(resMongo), &resMongoJSON)
+
+	if errMongo != nil {
+
+		return nil, errMongo
+
+	}
+
+	if int64(resMongoJSON.ID) != request.ID {
+		errIDMongoJSON := errors.New("ID de la respuesta y peticion no coincide")
+		return nil, errIDMongoJSON
+	}
+
+	if int(resMongoJSON.Status) != 200 {
+
+		errStatusMongoJSON := errors.New(resMongoJSON.Error)
+		return nil, errStatusMongoJSON
+	}
+
+	ids = resMongoJSON.Data
 
 	return ids, nil
 }
 
-func insertRelTag(Icon *Icon, tagIDs *[]string) error {
+func insertRelTag(Icon *Icon, tagIDs *[]string, TCPconn *net.Conn) error {
 
 	request := struct {
-		IDs    []string `json:"_ids"`
-		Iconos []int    `json:"iconos"`
+		ID   int64
+		Data struct {
+			IDs    []string `json:"_ids"`
+			Iconos []int    `json:"iconos"`
+		} `json:"data"`
 	}{
-		IDs:    *tagIDs,
-		Iconos: []int{Icon.ID},
+		ID: time.Now().Unix(),
 	}
+
+	request.Data.IDs = *tagIDs
+	request.Data.Iconos = []int{Icon.ID}
 
 	requestJSON, error := json.Marshal(request)
 
@@ -324,16 +344,40 @@ func insertRelTag(Icon *Icon, tagIDs *[]string) error {
 		return error
 	}
 
-	resInsert, err := client.Post("http://127.0.0.1:666/app/etiquetas/iconos", "application/json", bytes.NewBuffer(requestJSON))
+	fmt.Fprintf(*TCPconn, string(requestJSON))
+
+	// listen for reply
+	resMongo, err := bufio.NewReader(*TCPconn).ReadString('\n')
 
 	if err != nil {
 		return err
 	}
-	defer resInsert.Body.Close()
 
-	if resInsert.StatusCode != http.StatusOK {
-		errMongo := errors.New("Error de mongo Insertando relacion de tag-icono")
+	var resMongoJSON struct {
+		Status float64  `json:"status"`
+		Action string   `json:"action"`
+		ID     float64  `json:"id"`
+		Data   []string `json:"data"`
+		Error  string   `json:"error"`
+	}
+
+	errMongo := json.Unmarshal([]byte(resMongo), &resMongoJSON)
+
+	if errMongo != nil {
+
 		return errMongo
+
+	}
+
+	if int64(resMongoJSON.ID) != request.ID {
+		errIDMongoJSON := errors.New("ID de la respuesta y peticion no coincide")
+		return errIDMongoJSON
+	}
+
+	if int(resMongoJSON.Status) != 200 {
+
+		errStatusMongoJSON := errors.New(resMongoJSON.Error)
+		return errStatusMongoJSON
 	}
 
 	return nil
@@ -418,6 +462,13 @@ func main() {
 
 	fmt.Println("Cargando logos y etiquetas a DB final")
 
+	//Conectandose al servidor para cargar Logos
+	connTCP, err := net.Dial("tcp", TCPconfig.ip+":"+TCPconfig.port)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
 	//Iteramos sobre las descargas para obtener cada icono y su informacion
 	for iconDescargado := range descargas {
 
@@ -429,7 +480,7 @@ func main() {
 			continue
 		}
 
-		idsTags, err := iconDescargado.insertTag(&TagsJSON)
+		idsTags, err := iconDescargado.insertTag(&TagsJSON, &connTCP)
 
 		if err != nil {
 
@@ -437,43 +488,12 @@ func main() {
 			continue
 		}
 
-		errRel := insertRelTag(iconDescargado, &idsTags)
+		errRel := insertRelTag(iconDescargado, &idsTags, &connTCP)
 
 		if errRel != nil {
 			fmt.Println("Error relacionando tags:" + errRel.Error())
 			continue
 		}
-
-		//var tagIDs []string
-
-		//iteramos sobre cada tag del icono en Ingles
-		/*for _, tag := range iconDescargado.tags {
-
-			//obtenemos sus traducciones
-			tagMetas := findMetas(&TagsJSON, tag)
-			if tagMetas == nil {
-				fmt.Println(err.Error())
-				continue
-			}
-
-			//insertamos el tag en la base de datos del disenador
-			tagID, err := tagMetas.insert()
-			if err != nil {
-				fmt.Println(err.Error())
-				continue
-			}
-
-			tagIDs = append(tagIDs, tagID)
-
-			/
-				err = iconDescargado.insertRelTag(tagID)
-
-				if err != nil {
-
-					fmt.Println(err.Error())
-				}/
-
-		}*/
 
 	}
 
