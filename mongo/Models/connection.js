@@ -1,11 +1,9 @@
 const MongoClient = require('mongodb').MongoClient;
 const ObjectId = require('mongodb').ObjectID;
+const config = require('../config.js');
 
 // Connection URL
-const datos = {
-    url: "mongodb+srv://cis:unaclavemuysegura5000@bazam-cgzwr.mongodb.net/admin",
-    database: "disenador"
-};
+const datos = config.mongo;
 
 // Use connect method to connect to the server
 const mongo = {

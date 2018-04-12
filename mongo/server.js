@@ -1,42 +1,62 @@
+const net = require('net');
+const handlers = require('./handlers.js');
 const config = require('./config.js');
+const async = require('async');
 
-const express = require('express');
-const path = require('path');
-const cookieParser = require('cookie-parser');
-const bodyParser = require('body-parser');
-const compression = require('compression');
 
-const app = express();
+const handler = (data) => {
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(compression());
-app.enable('trust proxy');
+	return new Promise((resolve, reject) => {
 
-const rutas = require('./routes.js');
+		console.log(data)
 
-app.use('/app', rutas);
+		let id = JSON.parse(data.toString()).id;
+		let action = JSON.parse(data.toString()).action;
+		let body = JSON.parse(data.toString()).data;
 
-app.use(function(req, res, next) {
-  var err = new Error('No se encuentra');
-  err.status = 404;
-  next(err);
+		handlers[action](body, res => {
+
+			res.id = id;
+			res.action = action;
+
+			console.log(res);
+
+			if(res.status == 200){
+				resolve( JSON.stringify(res) );
+			}else{
+				reject( JSON.stringify(res) )
+			}
+
+			
+		})
+	})
+}
+
+var server = net.createServer(socket => {
+
+	console.log('Servidor creado');
+
+	socket.on('data', async data => {
+
+		try {
+			res = await handler(data);
+			socket.write(res); 
+		} catch (e) {
+			socket.write(e.toString()); 
+		}
+
+	})
+
+	socket.on('close', (had_error) => {
+		console.log(had_error);
+	});
+
+	socket.on('error', (e) => {
+		console.log(e.toString())
+	})
+
 });
 
-app.disable('x-powered-by');
-
-app.use(function(err, req, res, next) {
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-  res.status(err.status || 500);
-  res.send({ error: err.message });
+server.listen(config.port, config.host, 1, () => {
+	console.log("Servidor corriendo en el HOST:"+config.host+", PORT:"+config.port)
 });
-
-app.listen(config.puerto, function () {
-  console.log('Servidor corriendo en : modo('+config.servidor+'), puerto('+config.puerto+')');
-});
-
-module.exports = app;
