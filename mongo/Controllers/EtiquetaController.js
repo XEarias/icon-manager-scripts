@@ -2,22 +2,26 @@ const Etiqueta = require('../Models/Etiqueta.js');
 const Idioma = require('../Models/Idioma.js');
 const async = require('async');
 
-exports.ObtenerTodos = (req, res) => 
+exports.ObtenerTodos = (data, res) => 
 {
 	Etiqueta.ObtenerTodos((err, data) => {
 		if (data.length > 0) {
-			res.status(200).json(data);
+			return {
+				status: 200,
+				data: data
+			};
 		} else {
-			res.status(404).json({
-				'msg': 'No hay etiquetas en la base de datos'
-			});
+			return {
+				status: 404,
+				data: 'No hay etiquetas en la base de datos',
+			};
 		}
 	});
 }
 
-exports.GuardarEtiquetas = (req, res) => 
+exports.Guardar = (data, res) => 
 {
-	const etiquetas = req.body.etiquetas;
+	const etiquetas = data.etiquetas;
 
 	let insertIds = [];
 
@@ -112,12 +116,21 @@ exports.GuardarEtiquetas = (req, res) =>
 	}, err => { // fin de each para las etiquetas
 
 		if (err) {
-			res.status(500).json(err);
+			res({
+				status: 500,
+				error: err
+			});
 		} else {
 			if(insertIds.length){
-				res.status(200).json(insertIds);
+				res({
+					status: 200,
+					data: insertIds
+				});
 			}else{
-				res.status(500).json({msg:"No inserto ninguno"});
+				res({
+					status: 500,
+					error: "Algo ocurrio"
+				});
 			}
 		}
 
@@ -125,8 +138,8 @@ exports.GuardarEtiquetas = (req, res) =>
 
 }
 
-
-exports.ObtenerPorIcono = (req, res) => 
+/*
+exports.ObtenerPorIcono = (data, res) => 
 {
 	const id = req.params.id;
 
@@ -141,7 +154,7 @@ exports.ObtenerPorIcono = (req, res) =>
 	})
 }
 
-exports.Actualizar = (req, res) => 
+exports.Actualizar = (data, res) => 
 {
 	const _id = req.body._id;
 	const etiquetaData = req.body.etiqueta;
@@ -156,8 +169,9 @@ exports.Actualizar = (req, res) =>
 		}
 	})
 }
+*/
 
-exports.AsignarIconos = (req, res) => 
+exports.AsignarIconos = (data, res) => 
 {
 	const _ids = req.body._ids;
 	const idsIconos = req.body.iconos;
@@ -176,15 +190,21 @@ exports.AsignarIconos = (req, res) =>
 		})
 
 	}, err => {
-		if (err) res.status(500).json({
-			'msg': 'Algo ocurrio'
-		});
+		if (err) {
+			res({
+				status: 500,
+				error: 'Algo ocurrio'
+			});
+		};
 
-		res.status(200).json(affectedRows);
+		res({
+			status: 200,
+			data: affectedRows
+		});
 	})
 }
 
-exports.DesasignarIcono = (req, res) => 
+/*exports.DesasignarIcono = (data, res) => 
 {
 	const _id = req.params._id;
 	const idIcono = req.body.idIcono;
@@ -200,7 +220,7 @@ exports.DesasignarIcono = (req, res) =>
 	})
 }
 
-exports.Borrar = (req, res) => 
+exports.Borrar = (data, res) => 
 {
 	const _id = req.params._id;
 
@@ -213,4 +233,4 @@ exports.Borrar = (req, res) =>
 			});
 		}
 	})
-}
+}¨*/

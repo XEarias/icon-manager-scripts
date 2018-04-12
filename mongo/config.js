@@ -1,18 +1,10 @@
-const node_env = process.env.NODE_ENV || "desarrollo";
-
 const configuracion = {
-    produccion : {
-        servidor : "Produccion"
-    },
-
-    desarrollo : {
-        servidor : "Desarrollo",
-        secret :"unaclavemuysegura",
-    	seguridad :true,
-    	puerto : "666",
-    	url : "http://127.0.0.1:666",
+    port : 666,
+    host : "127.0.0.1",
+    mongo: {
+        url: "mongodb://127.0.0.1:27017",
+        database: "disenador"
     }
 }
 
-
-module.exports = configuracion[node_env];
+module.exports = configuracion;
