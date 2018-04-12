@@ -11,8 +11,8 @@ cantidad = cantidad ? parseInt(cantidad) : 0
 saltoArg = saltoArg ? parseInt(saltoArg) : 0
 
 let np = new NounProject({
-	key: "c262b78520734708a4b90c9f951f708e",
-	secret: "75639560369340d6b9211315f41bdaad"
+	key: "049d89ea99f6415c837e7f0de9040b96",
+	secret: "58dd191936204d42885a5ab4de7a6663"
 })
 
 let promises = []
@@ -29,7 +29,7 @@ csv()
 			let promiseGet = new Promise((resolve) => {
                 
 				//console.log("inicio "+tag.ENG+"#"+salto)
-				np.getIconsByTerm(tag.ENG, {offset: salto, limit_to_public_domain: 1}, (err, data) => {
+				np.getIconsByTerm(tag.ENG, {offset: salto, limit_to_public_domain: 0}, (err, data) => {
 
 					if (!err && data) {
 
