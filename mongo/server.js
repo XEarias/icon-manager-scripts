@@ -30,9 +30,11 @@ const handler = (data) => {
 
 var server = net.createServer(socket => {
 
-	console.log('Servidor creado');
+	console.log('Socket inciado');
 
 	socket.on('data', async data => {
+
+		console.log({req: data.toString()})
 
 		try {
 			res = await handler(data);
