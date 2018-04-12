@@ -33,7 +33,7 @@ type DB struct {
 var DBConfig = DB{
 	ip:       "127.0.0.1",
 	port:     "3306",
-	name:     "disenadorlogodb",
+	name:     "testdisenadorlogodb",
 	user:     "logoPro",
 	password: "&rJ-fZ:1uZ24",
 }
@@ -46,7 +46,7 @@ type TCPclient struct {
 
 /*TCPconfig son los datos de la del cliente de mongodb*/
 var TCPconfig = TCPclient{
-	ip:   "192.168.0.25",
+	ip:   "127.0.0.1",
 	port: "666",
 }
 
@@ -83,17 +83,20 @@ func createDB() error {
 
 	db, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/")
 	if err != nil {
+		fmt.Println("1")
 		return err
 	}
 	defer db.Close()
 
 	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS disenadorlogodb_uploads")
 	if err != nil {
+		fmt.Println("2")
 		return err
 	}
 
 	_, err = db.Exec("USE disenadorlogodb_uploads")
 	if err != nil {
+		fmt.Println("3")
 		return err
 	}
 
@@ -242,6 +245,7 @@ func (i *Icon) insert() error {
 
 	}
 
+	fmt.Println("Icono Insertado!")
 	i.ID = id
 
 	return nil
@@ -264,11 +268,11 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON, TCPconn *net.Conn) ([]str
 	var ids []string
 
 	request := struct {
-		ID     int64  `json: "id"`
+		ID     int64  `json:"id"`
 		Action string `json:"action"`
 		Data   struct {
 			Etiquetas []TagJSON `json:"etiquetas"`
-		} `json:"Data"`
+		} `json:"data"`
 	}{
 		ID:     time.Now().Unix(),
 		Action: "guardar",
@@ -282,6 +286,7 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON, TCPconn *net.Conn) ([]str
 		return nil, err
 	}
 
+	fmt.Println(string(requestJSON))
 	fmt.Fprintf(*TCPconn, string(requestJSON))
 
 	// listen for reply
@@ -319,7 +324,7 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON, TCPconn *net.Conn) ([]str
 	}
 
 	ids = resMongoJSON.Data
-
+	fmt.Println("Tags Insertadas!")
 	return ids, nil
 }
 
@@ -379,7 +384,7 @@ func insertRelTag(Icon *Icon, tagIDs *[]string, TCPconn *net.Conn) error {
 		errStatusMongoJSON := errors.New(resMongoJSON.Error)
 		return errStatusMongoJSON
 	}
-
+	fmt.Println("Relacion Creada!")
 	return nil
 
 }
