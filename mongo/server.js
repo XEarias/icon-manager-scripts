@@ -8,8 +8,6 @@ const handler = (data) => {
 
 	return new Promise((resolve, reject) => {
 
-		console.log(data)
-
 		let id = JSON.parse(data.toString()).id;
 		let action = JSON.parse(data.toString()).action;
 		let body = JSON.parse(data.toString()).data;
@@ -18,8 +16,6 @@ const handler = (data) => {
 
 			res.id = id;
 			res.action = action;
-
-			console.log(res);
 
 			if(res.status == 200){
 				resolve( JSON.stringify(res) );
