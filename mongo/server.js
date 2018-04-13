@@ -1,24 +1,24 @@
-const net = require('net');
-const handlers = require('./handlers.js');
-const config = require('./config.js');
-const async = require('async');
+const net = require("net")
+const handlers = require("./handlers.js")
+const config = require("./config.js")
+const async = require("async")
 
 
 const handler = (data) => {
 
 	return new Promise((resolve, reject) => {
 
-		let id = JSON.parse(data.toString()).id;
-		let action = JSON.parse(data.toString()).action;
-		let body = JSON.parse(data.toString()).data;
+		let id = JSON.parse(data.toString()).id
+		let action = JSON.parse(data.toString()).action
+		let body = JSON.parse(data.toString()).data
 
 		handlers[action](body, res => {
 
-			res.id = id;
-			res.action = action;
+			res.id = id
+			res.action = action
 
 			if(res.status == 200){
-				resolve( JSON.stringify(res) );
+				resolve( JSON.stringify(res) )
 			}else{
 				reject( JSON.stringify(res) )
 			}
@@ -30,18 +30,21 @@ const handler = (data) => {
 
 var server = net.createServer(socket => {
 
-	console.log('----Nueva conexion establecida----');
+	console.log("----Nueva conexion establecida----")
 
-	socket.on('data', async data => {
-
-		console.log({req: data.toString()})
-
-		try {
-			res = await handler(data);
-			socket.write(res); 
-		} catch (e) {
-			socket.write(res); 
-		}
+	socket.on("data", data => {
+	
+		handler(data)
+			.then((res) => {
+				socket.write(res)
+			})
+			.catch((res) => {
+				socket.write(res) 
+			})
+			.finally(() =>{
+				socket.end()
+			})
+			
 
 		socket.end()
 
@@ -49,16 +52,16 @@ var server = net.createServer(socket => {
 
 	})
 
-	socket.on('close', (error) => {
-		if(error) console.log("error:" + error);
-	});
+	socket.on("close", (error) => {
+		if(error) console.log("error:" + error)
+	})
 
-	socket.on('error', (e) => {
+	socket.on("error", (e) => {
 		if(e) console.log(e.toString())
 	})
 
-});
+})
 
 server.listen(config.port, config.host, 1, () => {
 	console.log("Servidor corriendo en el HOST:"+config.host+", PORT:"+config.port)
-});
+})
