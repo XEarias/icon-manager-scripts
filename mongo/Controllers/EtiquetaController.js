@@ -89,7 +89,7 @@ exports.Guardar = (data, res) =>
 							callback()
 
 						} else {
-							return callback({msg : "No existe el idioma"})
+							return callback("No existe el idioma")
 						}
 					})
 
