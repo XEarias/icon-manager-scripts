@@ -37,16 +37,14 @@ var server = net.createServer(socket => {
 		handler(data)
 			.then((res) => {
 				socket.write(res)
+				socket.end()
 			})
 			.catch((res) => {
 				socket.write(res) 
-			})
-			.finally(() =>{
 				socket.end()
 			})
 			
 
-		socket.end()
 
 		
 
