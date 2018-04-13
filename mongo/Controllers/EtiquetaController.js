@@ -1,6 +1,6 @@
-const Etiqueta = require('../Models/Etiqueta.js');
-const Idioma = require('../Models/Idioma.js');
-const async = require('async');
+const Etiqueta = require("../Models/Etiqueta.js")
+const Idioma = require("../Models/Idioma.js")
+const async = require("async")
 
 exports.ObtenerTodos = (data, res) => 
 {
@@ -9,39 +9,39 @@ exports.ObtenerTodos = (data, res) =>
 			return {
 				status: 200,
 				data: data
-			};
+			}
 		} else {
 			return {
 				status: 404,
-				data: 'No hay etiquetas en la base de datos',
-			};
+				data: "No hay etiquetas en la base de datos",
+			}
 		}
-	});
+	})
 }
 
 exports.Guardar = (data, res) => 
 {
-	const etiquetas = data.etiquetas;
+	const etiquetas = data.etiquetas
 
-	let insertIds = [];
+	let insertIds = []
 
 	// itera cada etiqueta
 	async.forEachOf(etiquetas, (etiqueta, keyEtiqueta, callback) => {
 
-		Etiqueta.ObtenerPorTraduccion(etiqueta['ENG'], (err, data) => {
+		Etiqueta.ObtenerPorTraduccion(etiqueta["ENG"], (err, data) => {
 
 			if (data.length > 0) {
 
 				data.forEach( el => {
-					insertIds.push(el._id);
+					insertIds.push(el._id)
 				})
 
-				callback();
+				callback()
 
 			} else {
 
 				let keys = Object.keys(etiqueta).filter( (val) => {
-					return val != 'categoria';
+					return val != "categoria"
 				})
 
 				let eitquetaOriginal = keys.map(function(val) {
@@ -49,11 +49,11 @@ exports.Guardar = (data, res) =>
 						idioma: val,
 						valor: etiqueta[val]
 					}
-				});
+				})
 
-				let et = { traducciones: eitquetaOriginal };
+				let et = { traducciones: eitquetaOriginal }
 
-				etiquetas[keyEtiqueta] = et;
+				etiquetas[keyEtiqueta] = et
 
 				// itera las traducciones de la etiqueta actual
 				async.forEachOf(et.traducciones, (traduccion, keyTraduccion, callback) => {
@@ -61,52 +61,52 @@ exports.Guardar = (data, res) =>
 					let normalize = (() => {
 						const from = "ÃÀÁÄÂÈÉËÊÌÍÏÎÒÓÖÔÙÚÜÛãàáäâèéëêìíïîòóöôùúüûÑñÇç",
 							to = "AAAAAEEEEIIIIOOOOUUUUaaaaaeeeeiiiioooouuuunncc",
-							mapping = {};
+							mapping = {}
 
 						for (let i = 0, j = from.length; i < j; i++)
-							mapping[from.charAt(i)] = to.charAt(i);
+							mapping[from.charAt(i)] = to.charAt(i)
 
 						return (str) => {
-							let ret = [];
+							let ret = []
 							for (var i = 0, j = str.length; i < j; i++) {
-								let c = str.charAt(i);
+								let c = str.charAt(i)
 								if (mapping.hasOwnProperty(str.charAt(i)))
-									ret.push(mapping[c]);
+									ret.push(mapping[c])
 								else
-									ret.push(c);
+									ret.push(c)
 							}
-							return ret.join('');
+							return ret.join("")
 						}
-					})();
+					})()
 					
-					etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor = normalize(etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor.toLowerCase());
+					etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor = normalize(etiquetas[keyEtiqueta].traducciones[keyTraduccion].valor.toLowerCase())
 
 					// obtiene el idioma de la traduccion actual
 					Idioma.ObtenerPorCodigo(traduccion.idioma, (err, data) => {
 						if (data !== null) {
 							// sobreescribe el campo idioma de la etiqueta actual
-							etiquetas[keyEtiqueta].traducciones[keyTraduccion].idioma = data._id;
-							callback();
+							etiquetas[keyEtiqueta].traducciones[keyTraduccion].idioma = data._id
+							callback()
 
 						} else {
-							return callback({msg : "No existe el idioma"});
+							return callback({msg : "No existe el idioma"})
 						}
 					})
 
 				}, err => { // fin de each para las traducciones
 
-					if (err) return callback(err);
+					if (err) return callback(err)
 
-					let etiquetaData = etiquetas[keyEtiqueta];
-					etiquetaData.iconos = [];
+					let etiquetaData = etiquetas[keyEtiqueta]
+					etiquetaData.iconos = []
 
 					// guardamos la etiqueta sobreescrita despues que termine el loop de sus traducciones
 					Etiqueta.Guardar(etiquetaData, (err, data) => {
-						if (typeof data !== 'undefined' && data.insertId) {
-							insertIds.push(data.insertId);
-							callback();
+						if (typeof data !== "undefined" && data.insertId) {
+							insertIds.push(data.insertId)
+							callback()
 						} else {
-							return callback(err);
+							return callback(err)
 						}
 					})
 				})
@@ -119,18 +119,20 @@ exports.Guardar = (data, res) =>
 			res({
 				status: 500,
 				error: err
-			});
+			})
 		} else {
+
 			if(insertIds.length){
+				console.log("Etiquetas devueltas!")
 				res({
 					status: 200,
 					data: insertIds
-				});
+				})
 			}else{
 				res({
 					status: 500,
 					error: "Algo ocurrio"
-				});
+				})
 			}
 		}
 
@@ -173,19 +175,20 @@ exports.Actualizar = (data, res) =>
 
 exports.AsignarIconos = (data, res) => 
 {
-	const _ids = req.body._ids;
-	const idsIconos = req.body.iconos;
+	const _ids = data._ids
+	const idsIconos = data.iconos
 
-	let affectedRows = [];
+	let affectedRows = []
 
+	
 	async.forEachOf(_ids, (id, key, callback) => {
 
 		Etiqueta.AsignarIconos(id, idsIconos, (err, data) => {
 			if (data !== null && data.affectedRow) {
-				affectedRows.push(data.affectedRow);
-				callback();
+				affectedRows.push(data.affectedRow._id)
+				callback()
 			} else {
-				return callback(err);
+				return callback(err)
 			}
 		})
 
@@ -193,14 +196,16 @@ exports.AsignarIconos = (data, res) =>
 		if (err) {
 			res({
 				status: 500,
-				error: 'Algo ocurrio'
-			});
-		};
-
+				error: "Algo ocurrio"
+			})
+		}
+		console.log("Iconos asignados!")
 		res({
 			status: 200,
 			data: affectedRows
-		});
+		})
+
+		
 	})
 }
 

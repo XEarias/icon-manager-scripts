@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -83,20 +84,17 @@ func createDB() error {
 
 	db, err := sql.Open("mysql", DBConfig.user+":"+DBConfig.password+"@tcp("+DBConfig.ip+":"+DBConfig.port+")/")
 	if err != nil {
-		fmt.Println("1")
 		return err
 	}
 	defer db.Close()
 
 	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS disenadorlogodb_uploads")
 	if err != nil {
-		fmt.Println("2")
 		return err
 	}
 
 	_, err = db.Exec("USE disenadorlogodb_uploads")
 	if err != nil {
-		fmt.Println("3")
 		return err
 	}
 
@@ -219,7 +217,7 @@ func (i *Icon) insert() error {
 			if err != nil {
 				return err
 			}
-
+			fmt.Println("-----Icono Insertado!-----")
 			i.ID = int(lastID)
 
 			stmtInsertUpload, err := dbUploads.Prepare("INSERT INTO icons_uploads(nounId,disenadorId) VALUES (?,?)")
@@ -245,14 +243,23 @@ func (i *Icon) insert() error {
 
 	}
 
-	fmt.Println("Icono Insertado!")
+	fmt.Println("-----Icono Insertado!-----")
 	i.ID = id
 
 	return nil
 
 }
 
-func (i *Icon) insertTag(tagsJSON *map[string]TagJSON, TCPconn *net.Conn) ([]string, error) {
+func (i *Icon) insertTag(tagsJSON *map[string]TagJSON) ([]string, error) {
+
+	//Conectandose al servidor para cargar Logos
+	TCPconn, err := net.Dial("tcp", TCPconfig.ip+":"+TCPconfig.port)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	defer TCPconn.Close()
 
 	var iconTagsJSON []TagJSON
 
@@ -286,14 +293,29 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON, TCPconn *net.Conn) ([]str
 		return nil, err
 	}
 
-	fmt.Println(string(requestJSON))
-	fmt.Fprintf(*TCPconn, string(requestJSON))
+	fmt.Fprintf(TCPconn, string(requestJSON))
+	// listen for
+	var resMongo string
 
-	// listen for reply
-	resMongo, err := bufio.NewReader(*TCPconn).ReadString('\n')
+	for {
+		// listen for reply
+		str, err := bufio.NewReader(TCPconn).ReadString('\n')
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			if err == io.EOF {
+				if len(str) > 0 {
+					resMongo += str
+				}
+				break
+			} else {
+				return nil, err
+			}
+		}
+
+		if len(str) > 0 {
+			resMongo += str
+		}
+
 	}
 
 	var resMongoJSON struct {
@@ -328,16 +350,27 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON, TCPconn *net.Conn) ([]str
 	return ids, nil
 }
 
-func insertRelTag(Icon *Icon, tagIDs *[]string, TCPconn *net.Conn) error {
+func insertRelTag(Icon *Icon, tagIDs *[]string) error {
+
+	//Conectandose al servidor para cargar Logos
+	TCPconn, err := net.Dial("tcp", TCPconfig.ip+":"+TCPconfig.port)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	defer TCPconn.Close()
 
 	request := struct {
-		ID   int64
-		Data struct {
+		Action string `json:"action"`
+		ID     int64  `json:"id"`
+		Data   struct {
 			IDs    []string `json:"_ids"`
 			Iconos []int    `json:"iconos"`
 		} `json:"data"`
 	}{
-		ID: time.Now().Unix(),
+		ID:     time.Now().Unix(),
+		Action: "asignarIconos",
 	}
 
 	request.Data.IDs = *tagIDs
@@ -349,13 +382,29 @@ func insertRelTag(Icon *Icon, tagIDs *[]string, TCPconn *net.Conn) error {
 		return error
 	}
 
-	fmt.Fprintf(*TCPconn, string(requestJSON))
+	fmt.Fprintf(TCPconn, string(requestJSON))
 
-	// listen for reply
-	resMongo, err := bufio.NewReader(*TCPconn).ReadString('\n')
+	var resMongo string
 
-	if err != nil {
-		return err
+	for {
+
+		str, err := bufio.NewReader(TCPconn).ReadString('\n')
+
+		if err != nil {
+			if err == io.EOF {
+				if len(str) > 0 {
+					resMongo += str
+				}
+				break
+			} else {
+				return err
+			}
+		}
+
+		if len(str) > 0 {
+			resMongo += str
+		}
+
 	}
 
 	var resMongoJSON struct {
@@ -369,7 +418,6 @@ func insertRelTag(Icon *Icon, tagIDs *[]string, TCPconn *net.Conn) error {
 	errMongo := json.Unmarshal([]byte(resMongo), &resMongoJSON)
 
 	if errMongo != nil {
-
 		return errMongo
 
 	}
@@ -467,13 +515,6 @@ func main() {
 
 	fmt.Println("Cargando logos y etiquetas a DB final")
 
-	//Conectandose al servidor para cargar Logos
-	connTCP, err := net.Dial("tcp", TCPconfig.ip+":"+TCPconfig.port)
-
-	if err != nil {
-		panic(err.Error())
-	}
-
 	//Iteramos sobre las descargas para obtener cada icono y su informacion
 	for iconDescargado := range descargas {
 
@@ -485,7 +526,7 @@ func main() {
 			continue
 		}
 
-		idsTags, err := iconDescargado.insertTag(&TagsJSON, &connTCP)
+		idsTags, err := iconDescargado.insertTag(&TagsJSON)
 
 		if err != nil {
 
@@ -493,7 +534,7 @@ func main() {
 			continue
 		}
 
-		errRel := insertRelTag(iconDescargado, &idsTags, &connTCP)
+		errRel := insertRelTag(iconDescargado, &idsTags)
 
 		if errRel != nil {
 			fmt.Println("Error relacionando tags:" + errRel.Error())

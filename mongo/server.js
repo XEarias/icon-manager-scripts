@@ -30,7 +30,7 @@ const handler = (data) => {
 
 var server = net.createServer(socket => {
 
-	console.log('Servidor creado');
+	console.log('----Nueva conexion establecida----');
 
 	socket.on('data', async data => {
 
@@ -38,17 +38,21 @@ var server = net.createServer(socket => {
 			res = await handler(data);
 			socket.write(res); 
 		} catch (e) {
-			socket.write(e.toString()); 
+			socket.write(res); 
 		}
+
+		socket.end()
+
+		
 
 	})
 
-	socket.on('close', (had_error) => {
-		console.log(had_error);
+	socket.on('close', (error) => {
+		if(error) console.log("error:" + error);
 	});
 
 	socket.on('error', (e) => {
-		console.log(e.toString())
+		if(e) console.log(e.toString())
 	})
 
 });
