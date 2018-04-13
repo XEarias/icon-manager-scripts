@@ -34,6 +34,8 @@ var server = net.createServer(socket => {
 
 	socket.on('data', async data => {
 
+		console.log({req: data.toString()})
+
 		try {
 			res = await handler(data);
 			socket.write(res); 
