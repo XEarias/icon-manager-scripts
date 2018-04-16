@@ -60,7 +60,7 @@ type Icon struct {
 	ID       int
 	svg      string
 	tags     []string
-	category string
+	category int
 	color    string
 	nounID   int
 }
@@ -69,12 +69,12 @@ type Icon struct {
 type IconJSON struct {
 	URL      string   `json:"url"`
 	Tags     []string `json:"tags"` //tags en ingles
-	Category string   `json:"category"`
+	Category int      `json:"category"`
 }
 
 /*TagJSON representa un JSON individiual de Tag */
 type TagJSON struct {
-	Categoria string `json:"categoria,omitempty"`
+	Categoria int    `json:"categoria,omitempty"`
 	ESP       string `json:"ESP"`
 	ENG       string `json:"ENG"`
 	POR       string `json:"POR"`
@@ -108,7 +108,7 @@ func createDB() error {
 }
 
 /*LeerImagen abre realiza una peticion Get por una imagen, la transforma en string y devuelve 1 objeto icono */
-func leerImagen(descargas *chan *Icon, wg *sync.WaitGroup, url string, tags []string, category string, nounID int) {
+func leerImagen(descargas *chan *Icon, wg *sync.WaitGroup, url string, tags []string, category int, nounID int) {
 
 	defer wg.Done()
 
@@ -268,7 +268,7 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON) ([]string, error) {
 		if tagMetas == nil {
 			continue
 		}
-		tagMetas.Categoria = ""
+		tagMetas.Categoria = 0
 		iconTagsJSON = append(iconTagsJSON, *tagMetas)
 	}
 
