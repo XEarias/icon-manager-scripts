@@ -148,7 +148,7 @@ connection.connect(function(err) {
 	
 							console.log("Todo preparado")
 	
-							exec("go run main.go", {cwd: "../upload"}, (error, stdout) => {
+							exec("./main", {cwd: "../upload"}, (error, stdout) => {
 								if (error) {
 									console.error(` ${error}`)
 									if(limpiarIntervalo){
