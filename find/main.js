@@ -85,7 +85,7 @@ connection.connect(function(err) {
 			}
 	
 			let icons = {}
-			console.log(promises)
+			
 			Promise.all(promises)
 	
 				.then((res) => {
@@ -183,7 +183,7 @@ connection.connect(function(err) {
 	let invervalo = setInterval(() => {
 	
 		queryInterval(true)
-	}, 3600000)
+	}, 1800000)
 	
 })
 
