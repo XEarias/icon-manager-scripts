@@ -92,7 +92,6 @@ func createDB() error {
 
 func main() {
 
-	defer os.Exit(0)
 	// Load a csv file.
 	tagsCSV, err := os.Open("./tags.csv")
 
@@ -138,5 +137,7 @@ func main() {
 			fmt.Println("Error al insertar tag: " + errInsert.Error())
 		}
 	}
+
+	return
 
 }
