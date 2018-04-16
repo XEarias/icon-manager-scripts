@@ -438,6 +438,9 @@ func insertRelTag(Icon *Icon, tagIDs *[]string) error {
 }
 
 func main() {
+
+	defer os.Exit(0)
+
 	//creamos un grupo para sincronizar todas las rutinas
 	var wg sync.WaitGroup
 
