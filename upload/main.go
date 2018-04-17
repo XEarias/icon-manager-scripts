@@ -217,7 +217,7 @@ func (i *Icon) insert() error {
 			if err != nil {
 				return err
 			}
-			fmt.Println("-----Icono Insertado!-----")
+			//fmt.Println("-----Icono Insertado!-----")
 			i.ID = int(lastID)
 
 			stmtInsertUpload, err := dbUploads.Prepare("INSERT INTO icons_uploads(nounId,disenadorId) VALUES (?,?)")
@@ -243,7 +243,7 @@ func (i *Icon) insert() error {
 
 	}
 
-	fmt.Println("-----Icono Insertado!-----")
+	//fmt.Println("-----Icono Insertado!-----")
 	i.ID = id
 
 	return nil
@@ -346,7 +346,7 @@ func (i *Icon) insertTag(tagsJSON *map[string]TagJSON) ([]string, error) {
 	}
 
 	ids = resMongoJSON.Data
-	fmt.Println("Tags Insertadas!")
+	//fmt.Println("Tags Insertadas!")
 	return ids, nil
 }
 
@@ -432,7 +432,7 @@ func insertRelTag(Icon *Icon, tagIDs *[]string) error {
 		errStatusMongoJSON := errors.New(resMongoJSON.Error)
 		return errStatusMongoJSON
 	}
-	fmt.Println("Relacion Creada!")
+	//fmt.Println("Relacion Creada!")
 	return nil
 
 }

@@ -148,7 +148,7 @@ connection.connect(function(err) {
 	
 							console.log("Todo preparado")
 	
-							exec("./main", {cwd: "../upload"}, (error, stdout) => {
+							exec("./main", {cwd: "../upload", maxBuffer: 1024 * 1000}, (error, stdout) => {
 								if (error) {
 									console.error(` ${error}`)
 									if(limpiarIntervalo){
