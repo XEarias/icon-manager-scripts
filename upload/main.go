@@ -15,7 +15,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -108,38 +107,38 @@ func createDB() error {
 }
 
 /*LeerImagen abre realiza una peticion Get por una imagen, la transforma en string y devuelve 1 objeto icono */
-func leerImagen(descargas *chan *Icon, wg *sync.WaitGroup, url string, tags []string, category int, nounID int) {
-
-	defer wg.Done()
+func leerImagen(url string, tags []string, category int, nounID int) (*Icon, error) {
 
 	resImg, err := client.Get(url)
 
 	if err != nil {
 
-		fmt.Println(err.Error())
-
-		return
+		return nil, err
 	}
 	defer resImg.Body.Close()
 
-	if resImg.StatusCode == http.StatusOK {
+	if resImg.StatusCode != http.StatusOK {
 
-		imgBytes, errBody := ioutil.ReadAll(resImg.Body)
+		errStatus := errors.New("Status para la descarga de Imagen no es 200")
 
-		if errBody != nil {
-			fmt.Println(errBody.Error())
-			return
-		}
-
-		svgParsed, color := svgParser(string(imgBytes))
-
-		svgBase64 := base64.StdEncoding.EncodeToString([]byte(svgParsed))
-
-		iconoDescargado := Icon{svg: svgBase64, tags: tags, category: category, color: color, nounID: nounID}
-
-		*descargas <- &iconoDescargado
+		return nil, errStatus
 
 	}
+
+	imgBytes, errBody := ioutil.ReadAll(resImg.Body)
+
+	if errBody != nil {
+
+		return nil, errBody
+	}
+
+	svgParsed, color := svgParser(string(imgBytes))
+
+	svgBase64 := base64.StdEncoding.EncodeToString([]byte(svgParsed))
+
+	iconoDescargado := Icon{svg: svgBase64, tags: tags, category: category, color: color, nounID: nounID}
+
+	return &iconoDescargado, nil
 
 }
 
@@ -440,7 +439,7 @@ func insertRelTag(Icon *Icon, tagIDs *[]string) error {
 func main() {
 
 	//creamos un grupo para sincronizar todas las rutinas
-	var wg sync.WaitGroup
+	//var wg sync.WaitGroup
 
 	//creamos un map contenedor de los registros JSON de iconos
 	IconsJSON := make(map[string]IconJSON)
@@ -463,12 +462,14 @@ func main() {
 	}
 
 	//contamos la cantidad de elementos, creamos un canal de comunicacion entre todas las rutinas y sincronizamos
-	cantidad := len(IconsJSON)
-	descargas := make(chan *Icon, cantidad)
-	wg.Add(cantidad)
+	//cantidad := len(IconsJSON)
+	//descargas := make(chan *Icon, cantidad)
+	//wg.Add(cantidad)
 
 	//Iniciamos las descargas asincronicamente
 	fmt.Println("Iniciando descargas!")
+
+	var descargas []Icon
 
 	for nounID, icon := range IconsJSON {
 		id, err := strconv.Atoi(nounID)
@@ -477,16 +478,22 @@ func main() {
 			continue
 		}
 
-		go leerImagen(&descargas, &wg, icon.URL, icon.Tags, icon.Category, id)
+		descarga, errDescarga := leerImagen(icon.URL, icon.Tags, icon.Category, id)
+		if errDescarga != nil {
+			continue
+		}
+
+		descargas = append(descargas, *descarga)
+
 	}
 
 	fmt.Println("Descargas en proceso...")
 
 	//esperamos a que todas las descargas se completen
-	wg.Wait()
+	//wg.Wait()
 
 	//cerramos el canal
-	close(descargas)
+	//close(descargas)
 
 	fmt.Println("Proceso de descarga terminó!")
 
@@ -517,7 +524,7 @@ func main() {
 	fmt.Println("Cargando logos y etiquetas a DB final")
 
 	//Iteramos sobre las descargas para obtener cada icono y su informacion
-	for iconDescargado := range descargas {
+	for _, iconDescargado := range descargas {
 
 		err = iconDescargado.insert()
 
@@ -535,7 +542,7 @@ func main() {
 			continue
 		}
 
-		errRel := insertRelTag(iconDescargado, &idsTags)
+		errRel := insertRelTag(&iconDescargado, &idsTags)
 
 		if errRel != nil {
 			fmt.Println("Error relacionando tags:" + errRel.Error())
